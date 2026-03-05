@@ -143,6 +143,8 @@ add_executable(${CMAKE_PROJECT_NAME}
         User/Algorithm/Src/Chassis_Calc.c
         User/App/Inc/Test_Task.h
         User/App/Src/Test_Task.c
+        User/App/Inc/Boomerang_Task.h
+        User/App/Src/Boomerang_Task.c
 )
 
 # 添加用户源文件

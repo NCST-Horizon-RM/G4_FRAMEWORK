@@ -613,3 +613,40 @@ float TD_Calculate(TD_t *td, float input)
 
     return td->x;
 }
+
+void LESO_Init(LESO_t *leso, float b, float wo)
+{
+    leso->b = b;
+    leso->wo = wo;
+
+    leso->l1 = 2.0f * wo;
+    leso->l2 = wo * wo;
+
+    leso->z1 = 0.0f;
+    leso->z2 = 0.0f;
+
+    leso->last_dz1 = 0.0f;
+    leso->last_dz2 = 0.0f;
+
+    leso->DWT_CNT = DWT_GetTimeline_ms();
+}
+
+float LESO_Calculate(LESO_t *leso, float measure, float u)
+{
+    uint32_t tmp = leso->DWT_CNT;
+    leso->dt = DWT_GetDeltaT(&tmp);
+    leso->DWT_CNT = tmp * 0.001f;
+
+    if (leso->dt <= 0.0f || leso->dt > 0.01f)
+        return leso->z2;
+
+    leso->Input = measure;
+    leso->u = u;
+
+    // 估计状态
+    leso->z1 += (leso->z2 + leso->b * leso->u - leso->l1 * (leso->z1 - leso->Input)) * leso->dt;
+    leso->z2 += (-leso->l2 * (leso->z1 - leso->Input)) * leso->dt;
+
+    // 输出扰动估计
+    return leso->z2;
+}

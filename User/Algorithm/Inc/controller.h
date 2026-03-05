@@ -258,4 +258,31 @@ typedef struct __packed
 void TD_Init(TD_t *td, float r, float h0);
 float TD_Calculate(TD_t *td, float input);
 
+typedef struct __packed
+{
+    float Input;     // 系统输出 y
+    float u;         // 控制输入 u
+
+    float b;         // 控制增益估计值
+    float wo;        // 观测器带宽
+
+    float l1;        // ESO增益
+    float l2;
+
+    float z1;        // 状态估计 x1^
+    float z2;        // 扰动估计 x2^
+
+    float last_z1;
+    float last_z2;
+
+    float last_dz1;
+    float last_dz2;
+
+    uint32_t DWT_CNT;
+    float dt;
+
+} LESO_t;
+
+void LESO_Init(LESO_t *leso, float b, float wo);
+float LESO_Calculate(LESO_t *leso, float measure, float u);
 #endif //G4_FRAMEWORK_CONTROLLER_H

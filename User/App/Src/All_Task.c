@@ -181,7 +181,7 @@ CCM_FUNC void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t Rx
         {
             switch (rx.Identifier)
             {
-                case 0x207:
+                case 0x205:
                     DJI_Motor_Resolve(&All_Motor.DJI_6020_Pitch, data);
                     break;
                 case 0x605:
