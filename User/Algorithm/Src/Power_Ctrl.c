@@ -122,7 +122,7 @@ float SectionLimit_f(float max, float min, float data)
   * @time: 24-4-1
   * @ReadMe:
  */
-void PID_buffer(PID_buffer_t *PID_buffer, float power_buffer, float temp)
+void PID_buffer(PID_buffer_t *PID_buffer, float power_buffer, float temp)//
 {
     PID_buffer->Error[0] = temp - power_buffer;
     /*比例输出*/
@@ -176,7 +176,7 @@ uint8_t chassis_power_control(CONTAL_Typedef *RUI_V_CONTAL_V,
     /*没电容时开启*/
     PID_buffer(&model->PID_Buffer, chassis_power_buffer, 25);  // 缓冲能量闭环
 
-    input_power = (float)max_power_limit - model->PID_Buffer.All_out;  // 加入缓冲能量
+    input_power = (float)max_power_limit + model->PID_Buffer.All_out;  // 加入缓冲能量
 
     if(CAP_GET->CAP_VOLT > (float)capValt)
     {
@@ -219,10 +219,10 @@ uint8_t chassis_power_control(CONTAL_Typedef *RUI_V_CONTAL_V,
         }
 
         //对每个电机分别进行功率限制
-        chassis_power_limit(&MOTOR->DJI_3508_Chassis_1, 1, model);
-        chassis_power_limit(&MOTOR->DJI_3508_Chassis_2, 2, model);
-        chassis_power_limit(&MOTOR->DJI_3508_Chassis_3, 3, model);
-        chassis_power_limit(&MOTOR->DJI_3508_Chassis_4, 4, model);
+        chassis_power_limit(&MOTOR->DJI_3508_Chassis_1, model->scaled_give_power[0], model);
+        chassis_power_limit(&MOTOR->DJI_3508_Chassis_2, model->scaled_give_power[1], model);
+        chassis_power_limit(&MOTOR->DJI_3508_Chassis_3, model->scaled_give_power[2], model);
+        chassis_power_limit(&MOTOR->DJI_3508_Chassis_4, model->scaled_give_power[3], model);
     }
     return RUI_DF_READY;
 }

@@ -152,6 +152,8 @@ int main(void)
   MX_CORDIC_Init();
   MX_QUADSPI1_Init();
   MX_UART5_Init();
+  MX_TIM5_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
   All_Init();
   /* USER CODE END 2 */
