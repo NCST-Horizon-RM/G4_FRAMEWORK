@@ -99,7 +99,7 @@ void Test_Task(void *argument)
     for(;;)
     {
         Ctrl_Test_Task();
-        osDelay(1);
+        osDelay(5);
     }
 }
 
@@ -181,8 +181,11 @@ CCM_FUNC void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t Rx
         {
             switch (rx.Identifier)
             {
-                case 0x205:
-                    DJI_Motor_Resolve(&All_Motor.DJI_6020_Pitch, data);
+                case 0x201:
+                    DJI_Motor_Resolve(&All_Motor.DJI_3508_Pull, data);
+                    break;
+                case 0x202:
+                    DJI_Motor_Resolve(&All_Motor.DJI_2006_Yaw, data);
                     break;
                 case 0x605:
                     CAN_POWER_Rx(&All_Power.P5, data);

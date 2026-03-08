@@ -145,6 +145,8 @@ add_executable(${CMAKE_PROJECT_NAME}
         User/App/Src/Test_Task.c
         User/App/Inc/Boomerang_Task.h
         User/App/Src/Boomerang_Task.c
+        User/Device/Inc/serial_servo.h
+        User/Device/Src/serial_servo.c
 )
 
 # 添加用户源文件
