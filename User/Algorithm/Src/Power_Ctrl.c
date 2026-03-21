@@ -20,7 +20,7 @@ void Power_control_init(model_t *model)
     model->k1 = 1.5756155501e-02f;//kt：M3508鼙鼓的转矩常数Nm/A,对应机械功率项，与转速和电流乘积成正比
     model->k2 = 1.1584598349e-01f;//kr：M3508鼙鼓和C620电调的电阻Ω，对应铜损项，与电流平方成正比
     model->k3 = 1.9202168378e-05f;//k_iron：M3508电机铁损系数 (W/(rad/s)²)，对应铁损项（磁滞/涡流损耗），与转速平方成正比
-    model->k4 = 2.1291187956e+00f;//k0：M3508电机和C620电调的静态功率W，对应固定损耗项，与转速和电流无关
+    model->k4 = 2.1617225437e+00f;//k0：M3508电机和C620电调的静态功率W，对应固定损耗项，与转速和电流无关
 
     model->rpm_to_rad = 2.0f * 3.1415926f / 60.0f;//RPM转rad/s
 }
@@ -60,7 +60,6 @@ void chassis_power_distribute(DJI_MOTOR_Typedef *motor[4],
     {
         float w = motor[i]->DATA.Speed_now * model->rpm_to_rad;
 
-        // ⚠️ 和你前面统一：必须一致！！
         float I = I_cmd[i] * 20.0f / 16384.0f;
 
         A += model->k2 * I * I;
@@ -68,7 +67,6 @@ void chassis_power_distribute(DJI_MOTOR_Typedef *motor[4],
         C += model->k3 * w * w;
     }
 
-    // ✅ 功率预测（是否需要限功率）
     float P_predict = A + B + C + P_limit;
 
     if(P_predict <= P_limit)
@@ -84,11 +82,11 @@ void chassis_power_distribute(DJI_MOTOR_Typedef *motor[4],
     }
     else
     {
-        float discriminant = B * B - 4.0f * A * C;
+        float delta = B * B - 4.0f * A * C;
 
-        if(discriminant >= 0.0f)
+        if(delta >= 0.0f)
         {
-            s = (-B + sqrtf(discriminant)) / (2.0f * A);
+            s = (-B + sqrtf(delta)) / (2.0f * A);
         }
         else
         {
@@ -99,7 +97,6 @@ void chassis_power_distribute(DJI_MOTOR_Typedef *motor[4],
     if(s > 1.0f) s = 1.0f;
     if(s < 0.0f) s = 0.0f;
 
-    // ✅ 统一缩放
     for(int i = 0; i < 4; i++)
     {
         I_cmd[i] *= s;

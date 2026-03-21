@@ -149,6 +149,8 @@ add_executable(${CMAKE_PROJECT_NAME}
         User/Device/Src/serial_servo.c
         User/Device/Inc/LK_Motor.h
         User/Device/Src/LK_Motor.c
+        User/Device/Inc/VT13.h
+        User/Device/Src/VT13.c
 )
 
 # 添加用户源文件

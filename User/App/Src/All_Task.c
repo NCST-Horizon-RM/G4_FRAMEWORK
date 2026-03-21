@@ -89,7 +89,9 @@ void Motor_Task(void *argument)
             User_data.power_heat_data.buffer_energy,
             All_Motor.DJI_3508_Chassis[2].PID_S.Output,
             All_Motor.DJI_3508_Chassis[2].DATA.Speed_now,
-            m,All_Power.P4.power-11.5,User_data.robot_status.chassis_power_limit);
+            0,
+            All_Power.P4.power-11.5,
+            User_data.robot_status.chassis_power_limit);
         osDelay(1);
     }
 }
