@@ -116,7 +116,7 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size){
     if (huart->Instance == USART1){
         WS2812_SetPixel(1, 0, 0, 255); // 接收完成后设置LED1为蓝色，表示接收成功
         Read_Data_first(&Referee_Rx_Buf, &User_data, Size);
-        memset((uint8_t*)Referee_Rx_Buf.Data,0,Size);
+        memset(Referee_Rx_Buf.Data,0,Size);
         WS2812_SetPixel(1, 0, 0, 0);
     }
 }
