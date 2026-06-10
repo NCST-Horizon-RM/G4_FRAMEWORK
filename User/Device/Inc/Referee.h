@@ -8,6 +8,7 @@
 
 /* 帧长度 */
 #define REFEREE_RXFRAME_LENGTH 256
+#define REFEREE_MAX_PACKET_SIZE 136 // 裁判系统单包最大长度
 #define FrameHeader_Length 5U
 #define CMDID_Length 2U
 #define CRC16_Length 2U
@@ -170,7 +171,7 @@ typedef struct __packed
 typedef struct __packed
 {
     uint8_t armor_id : 4;                        /* 受击装甲板 ID：0~4 代表对应位置装甲板编号 */
-    uint8_t HP_deduction_reason : 4;             /* 扣血原因：0-装甲受击, 1-模块掉线, 2-超功率, 3-超初速, 4-超热量 */
+    uint8_t HP_deduction_reason : 4;             /* 扣血原因：0-装甲受弹丸攻击, 1-装甲模块或超级电容管理模块离线 , 5-装甲模块受到撞击  */
 } hurt_data_t;
 
 /* 0x0207 实时射击数据 */
@@ -482,7 +483,7 @@ typedef union
 
 } ALL_RX_Data_T;
 
-extern uint8_t Referee_Rx_Buf[REFEREE_RXFRAME_LENGTH];
+extern uint8_t Referee_Rx_Buf[2][REFEREE_RXFRAME_LENGTH];
 extern User_Data_T User_data;
 
 void Referee_System_Frame_Update(uint8_t *Buff, uint16_t Size);

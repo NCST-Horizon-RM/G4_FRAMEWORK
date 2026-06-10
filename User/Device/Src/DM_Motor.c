@@ -175,5 +175,7 @@ void DM_Motor_Send(FDCAN_HandleTypeDef* hcan, uint16_t master_id, float m1_cur, 
         data[i*2]   = (uint8_t)(cur_val[i] >> 8);
         data[i*2+1] = (uint8_t)(cur_val[i] & 0xFF);
     }
-    FDCAN_Send_Msg(hcan, master_id, data, 8);
+    if (HAL_FDCAN_GetTxFifoFreeLevel(hcan) > 0) {
+        FDCAN_Send_Msg(hcan, master_id, data, 8);
+    }
 }

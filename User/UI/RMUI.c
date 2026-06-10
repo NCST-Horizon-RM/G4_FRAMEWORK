@@ -28,6 +28,39 @@ void UI_AddData(const uint8_t data[], const size_t len) {
     }
 }
 
+/**
+ * @brief  更新受击UI数据
+ * @param  ui: UI结构体指针
+ * @param  armor_id: 裁判系统传入的装甲板ID (0-3)
+ * @param  chassis_yaw_ecd: 当前底盘相对于云台的角度（可以通过编码器解算得到，单位：度）
+ */
+void UI_UpdateHurtDirection(UI_t* ui, uint8_t armor_id, float chassis_yaw_ecd) {
+    float armor_angle_chassis = 0.0f;
+
+    // 1. 根据装甲板ID映射其在底盘上的绝对几何角度
+    switch (armor_id) {
+        case 0: armor_angle_chassis = 0.0f;   break; // 前
+        case 1: armor_angle_chassis = 90.0f;  break; // 左
+        case 2: armor_angle_chassis = 180.0f; break; // 后
+        case 3: armor_angle_chassis = 270.0f; break; // 右
+        default: return; // 异常ID（如掉线扣血等）不处理
+    }
+
+    // 2. 将底盘受击角度转换到【云台相对坐标系】
+    // 你的 updateLib 中受击角度定义的是：12点钟方向为0°，顺时针为正
+    // 公式：云台视角的受击角 = 底盘视角受击角 + 底盘相对于云台的角度
+    float armor_angle_gimbal = armor_angle_chassis + chassis_yaw_ecd;
+
+    // 3. 限制到 0~360 度
+    while (armor_angle_gimbal >= 360.0f) armor_angle_gimbal -= 360.0f;
+    while (armor_angle_gimbal < 0.0f)    armor_angle_gimbal += 360.0f;
+
+    // 4. 写入 UI 状态机
+    ui->hurt_dir = armor_angle_gimbal;
+    ui->is_hurt = true;
+    ui->hurt_trigger_tick = DWT_GetTimeline_us(); // 刷新触发时间
+}
+
 void UI_Init(UI_t* ui, const ui_config_t* config) {
     ui->config = *config;
 
@@ -63,6 +96,7 @@ static void updateLib(UI_t* ui) {
     if (end_angle < 0) end_angle += 360;
     ui_g_1_dir->start_angle = start_angle;
     ui_g_1_dir->end_angle = end_angle;
+    ui_g_1_dir->width = 0;
 
     // 云台 IMU 绝对角度显示
     ui_g_2_yaw->number = (int32_t)ui->yaw;
@@ -143,11 +177,14 @@ static void updateLib(UI_t* ui) {
     ui_g_32_aim->color = ui->robot.aim;
 }
 
+#define HURT_UI_KEEP_TIME_US 400000
 void UI_OnLoop(UI_t* ui) {
+    uint64_t now_us = DWT_GetTimeline_us();
+    if (ui->is_hurt && (now_us - ui->hurt_trigger_tick >= HURT_UI_KEEP_TIME_US)) {
+        ui->is_hurt = false;
+    }
     update_rmui_robot_id();
     updateLib(ui);
-
-    uint64_t now_us = DWT_GetTimeline_us();
 
     if (now_us - ui->last_poll_tick >= SEND_INTERVAL_US) {
         ui->last_poll_tick = now_us;
@@ -169,6 +206,9 @@ void UI_OnLoop(UI_t* ui) {
 }
 
 void UI_SendUartCmd(UI_t* ui) {
+    if (huart1.gState != HAL_UART_STATE_READY) {
+        return;
+    }
     if (head != tail) {
         uint16_t send_len = 0;
         static uint8_t temp_send_buf[TXBUF_SIZE]; // 提取缓冲区

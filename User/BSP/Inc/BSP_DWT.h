@@ -15,7 +15,7 @@ typedef struct
     uint16_t us;
 } DWT_Time_t;
 
-void DWT_Init(uint32_t CPU_Freq_mHz);
+void DWT_Init(uint32_t CPU_Freq_MHz);
 float DWT_GetDeltaT(uint32_t *cnt_last);
 double DWT_GetDeltaT64(uint32_t *cnt_last);
 float DWT_GetTimeline_s(void);

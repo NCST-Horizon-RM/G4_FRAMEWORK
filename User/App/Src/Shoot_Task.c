@@ -3,89 +3,186 @@
 //
 #include "Shoot_Task.h"
 
-#define TOTAL_SLOTS          6.0f                    // 一圈6个格
-#define ZERO_OFFSET          1310.0f                 // 零点位置
-#define COUNTS_PER_SHOT      (8192 / TOTAL_SLOTS) // 每一格的脉冲数 (1365.3333f)
+#define TOTAL_SLOTS         6.0f
+#define FEED_ZERO_OFFSET    1325.0f
+#define COUNTS_PER_SHOT     (8192.0f / TOTAL_SLOTS)
 
 DM4310_Feeder_t g_feed_motor = {0};
+Calib_State_t   g_calib_state = CALIB_START;
+Pull_State_t    g_pull_state = PULL_STATE_NORMAL;
+
+float g_zero_offset_angle = 0.0f;
+float g_mid_offset_angle  = 0.0f;
+uint16_t g_pull_delay_counter = 0;
+uint8_t  last_v = GPIO_PIN_SET;
 
 void Shoot_Control_Init() {
-    float PID_P_FEED[3] = {1.0f,0.0f,0.0f};
-    float PID_S_FEED[3] = {0.4f,0.0f,0.0f};
+    float PID_P_FEED[3] = {1.0f, 0.0f, 0.0f};
+    float PID_S_FEED[3] = {0.4f, 0.0f, 0.0f};
+    float PID_P_YAW[3]  = {1.6f, 0.0f, 0.0f};
+    float PID_S_YAW[3]  = {8.0f, 0.01f, 0.0f};
+    float PID_P_PULL[3] = {1.0f, 0.0f, 0.0f};
+    float PID_S_PULL[3] = {7.0f, 0.0f, 0.0f};
 
-    PID_Init(&All_Motor.DM4310_Feed.PID_P,150,30,
-        PID_P_FEED,0,0,
-        0,0,0,
-        Integral_Limit|ErrorHandle//积分限幅,输出滤波,堵转监测
-        //梯形积分,变速积分
-        );//微分先行,微分滤波器
-    PID_Init(&All_Motor.DM4310_Feed.PID_S,35,10,
-        PID_S_FEED,0,0,
-        0,0,0,
-        Integral_Limit|ErrorHandle//积分限幅,输出滤波,堵转监测
-        //梯形积分,变速积分
-        );//微分先行,微分滤波器
+    uint8_t mode = Integral_Limit | ErrorHandle;
 
-    g_feed_motor.is_init = false;
-    g_feed_motor.target_pos_cnt = 0;
+    // Feed (DM4310)
+    PID_Init(&All_Motor.DM4310_Feed.PID_P, 80, 30, PID_P_FEED, 0, 0, 0, 0, 0, mode);
+    PID_Init(&All_Motor.DM4310_Feed.PID_S, 15, 10, PID_S_FEED, 0, 0, 0, 0, 0, mode);
+
+    // Yaw (3508)
+    PID_Init(&All_Motor.DJI_3508_Yaw.PID_P, 1000, 150, PID_P_YAW, 0, 0, 0, 0, 0, mode);
+    PID_Init(&All_Motor.DJI_3508_Yaw.PID_S, 16384, 2000, PID_S_YAW, 0, 0, 0, 0, 0, mode);
+
+    // Pull (3508)
+    if (g_pull_state == PULL_STATE_RESET) {
+        PID_Init(&All_Motor.DJI_3508_Pull.PID_P, 2500, 100, PID_P_PULL, 0, 0, 0, 0, 0, mode);
+    }
+    else {
+        PID_Init(&All_Motor.DJI_3508_Pull.PID_P, 4000, 100, PID_P_PULL, 0, 0, 0, 0, 0, mode);
+    }
+    PID_Init(&All_Motor.DJI_3508_Pull.PID_S, 16384, 2000, PID_S_PULL, 0, 0, 0, 0, 0, mode);
 }
 
 void Ctrl_Shoot_Task() {
-    // 1. 【核心修复】防数据未就绪保护
-    // 如果上电后 CAN 还没收到数据，位置和速度通常全为 0。
-    // 如果你的电机接收函数有专门的 .is_online 或 .msg_cnt 标志位，推荐替换为：if(!All_Motor.DM4310_Feed.is_online) return;
     if (All_Motor.DM4310_Feed.DATA.Angle_Infinite == 0.0f && All_Motor.DM4310_Feed.DATA.Speed_now == 0.0f) {
-        return; // 数据还没准备好，直接跳出，等待下一帧真实绝对位置
+        return;
     }
 
     float current_pulse = All_Motor.DM4310_Feed.DATA.Angle_Infinite;
 
     if (!g_feed_motor.is_init) {
-        // 算出当前编码器读数距离你定义的零点的绝对距离
-        float relative_pos = current_pulse - ZERO_OFFSET;
-        float current_exact_slot = relative_pos / COUNTS_PER_SHOT;
-
-        // 2. 【核心修复】不管正负半轴，统一强行推向“负方向下一发”
-        // 减去 0.001f 的妙处：
-        // - 如果在 2.5 格，减去后是 2.499 -> floorf 得到 2（往负方向移到第2格）
-        // - 如果刚好卡在 2.0 格，减去后是 1.999 -> floorf 得到 1（强行推进到下一格，不会原地不动）
-        // - 如果在 -2.3 格，减去后是 -2.301 -> floorf 得到 -3（往负方向移到第-3格）
-        g_feed_motor.target_pos_cnt = (int32_t)floorf(current_exact_slot);
-
-        // 根据当前锁定的格子数，计算出真正的绝对目标脉冲
-        g_feed_motor.target_pos = ZERO_OFFSET + ((float)g_feed_motor.target_pos_cnt * COUNTS_PER_SHOT);
-
-        // 平滑同步：让斜坡从当前的真实绝对位置开始递减，绝对不会暴冲或倒车
+        g_feed_motor.target_pos_cnt = (int32_t)floorf((current_pulse - FEED_ZERO_OFFSET) / COUNTS_PER_SHOT);
         g_feed_motor.smooth_ref = current_pulse;
         g_feed_motor.is_init = true;
     }
 
-    // --- 后续按键与 PID 控制逻辑（保持不变） ---
-    uint8_t current_btn_state = (DBUS.Remote.S1 == 1);
-
-    if (current_btn_state && !g_feed_motor.last_btn_state) {
-        g_feed_motor.target_pos_cnt -= 1;
-    }
-    g_feed_motor.last_btn_state = current_btn_state;
-
-    float final_target = ZERO_OFFSET + ((float)g_feed_motor.target_pos_cnt * COUNTS_PER_SHOT);
-    float step_per_frame = 5.0f;
+    float final_target = FEED_ZERO_OFFSET + ((float)g_feed_motor.target_pos_cnt * COUNTS_PER_SHOT);
 
     if (g_feed_motor.smooth_ref > final_target) {
-        g_feed_motor.smooth_ref -= step_per_frame;
-        if (g_feed_motor.smooth_ref < final_target) {
-            g_feed_motor.smooth_ref = final_target;
-        }
-    }
-    else if (g_feed_motor.smooth_ref < final_target) {
+        g_feed_motor.smooth_ref -= 5.0f;
+        if (g_feed_motor.smooth_ref < final_target) g_feed_motor.smooth_ref = final_target;
+    } else {
         g_feed_motor.smooth_ref = final_target;
     }
 
-    All_Motor.DM4310_Feed.PID_P.Ref = g_feed_motor.smooth_ref;
     PID_Calculate(&All_Motor.DM4310_Feed.PID_P, current_pulse, g_feed_motor.smooth_ref);
     PID_Calculate(&All_Motor.DM4310_Feed.PID_S, All_Motor.DM4310_Feed.DATA.Speed_now, All_Motor.DM4310_Feed.PID_P.Output);
     DM_Motor_Send(&hfdcan2, 0x3FE, -All_Motor.DM4310_Feed.PID_S.Output, 0, 0, 0);
+
+    All_Motor.DJI_3508_Yaw.PID_P.Ref -= DBUS.Remote.CH3 * 0.09f;
+    All_Motor.DJI_3508_Yaw.PID_P.Ref = MATH_Limit_float(All_Motor.DJI_3508_Yaw.PID_P.Ref,
+                                                        g_mid_offset_angle - 72550.0f,
+                                                        g_mid_offset_angle + 72550.0f);
+    PID_Calculate(&All_Motor.DJI_3508_Yaw.PID_P, All_Motor.DJI_3508_Yaw.DATA.Angle_Infinite, All_Motor.DJI_3508_Yaw.PID_P.Ref);
+    PID_Calculate(&All_Motor.DJI_3508_Yaw.PID_S, All_Motor.DJI_3508_Yaw.DATA.Speed_now, All_Motor.DJI_3508_Yaw.PID_P.Output);
+
+    GPIO_PinState current_switch_v = HAL_GPIO_ReadPin(Switch_GPIO_Port, Switch_Pin);
+
+    switch (g_pull_state) {
+        case PULL_STATE_NORMAL:
+            htim5.Instance->CCR2 = 1200;
+            All_Motor.DJI_3508_Pull.PID_P.Ref += 200.0f;
+            if (current_switch_v == GPIO_PIN_RESET && last_v == GPIO_PIN_SET) {
+                htim5.Instance->CCR2 = 600;
+                g_pull_delay_counter = 0;
+                g_pull_state = PULL_STATE_TRIGGERED;
+            }
+            break;
+
+        case PULL_STATE_TRIGGERED:
+            All_Motor.DJI_3508_Pull.PID_P.Ref = All_Motor.DJI_3508_Pull.DATA.Angle_Infinite;
+            if (++g_pull_delay_counter >= 580) {
+                All_Motor.DJI_3508_Pull.PID_P.Ref -= 1100000.0f;
+                g_feed_motor.target_pos_cnt -= 1;
+                g_pull_state = PULL_STATE_RESET;
+            }
+            break;
+
+        case PULL_STATE_RESET:
+            if (MATH_ABS_float(All_Motor.DJI_3508_Pull.DATA.Angle_Infinite - All_Motor.DJI_3508_Pull.PID_P.Ref) < 1000.0f
+                && g_feed_motor.smooth_ref == final_target) {
+                All_Motor.DJI_3508_Pull.PID_S.Iout = 0.0f;
+                g_pull_state = PULL_STATE_STOPPED;
+            }
+            break;
+
+        case PULL_STATE_STOPPED:
+             static uint8_t last_s1 = 0;
+            if (DBUS.Remote.S1 == 1 && last_s1 == 3) {
+                htim5.Instance->CCR2 = 1200;
+                g_pull_state = PULL_STATE_NORMAL;
+            }
+            last_s1 = DBUS.Remote.S1;
+            break;
+    }
+    last_v = current_switch_v;
+
+    float pull_output = 0.0f;
+    if (g_pull_state != PULL_STATE_STOPPED) {
+        PID_Calculate(&All_Motor.DJI_3508_Pull.PID_P, All_Motor.DJI_3508_Pull.DATA.Angle_Infinite, All_Motor.DJI_3508_Pull.PID_P.Ref);
+        PID_Calculate(&All_Motor.DJI_3508_Pull.PID_S, All_Motor.DJI_3508_Pull.DATA.Speed_now, All_Motor.DJI_3508_Pull.PID_P.Output);
+        pull_output = All_Motor.DJI_3508_Pull.PID_S.Output;
+    }
+
+    DJI_Motor_Send(&hfdcan2, 0x200, 0, pull_output, All_Motor.DJI_3508_Yaw.PID_S.Output, 0);
 }
+
+uint8_t Check_Motor_Reached_Limit(DJI_MOTOR_Typedef* motor, float target_speed, float stuck_current, uint16_t confirm_time) {
+    static uint16_t limit_check_counter = 0;
+    static float Last_Angle_Infinite = 0;
+
+    float pos_delta = MATH_ABS_float(motor->DATA.Angle_Infinite - Last_Angle_Infinite);
+    float current   = MATH_ABS_float(motor->DATA.current);
+    float speed     = MATH_ABS_float(motor->DATA.Speed_now);
+
+    if (pos_delta < 10.0f && current > stuck_current && speed < MATH_ABS_float(target_speed) * 0.2f) {
+        if (++limit_check_counter >= confirm_time) {
+            limit_check_counter = 0;
+            return 1;
+        }
+    } else {
+        limit_check_counter = 0;
+    }
+    Last_Angle_Infinite = motor->DATA.Angle_Infinite;
+    return 0;
+}
+
+void Motor_Calibration_Task() {
+    switch (g_calib_state) {
+        case CALIB_START:
+            //g_calib_state = CALIB_NORMAL;
+            g_calib_state = CALIB_MOVING;
+            break;
+
+        case CALIB_MOVING:
+            PID_Calculate(&All_Motor.DJI_3508_Yaw.PID_S, All_Motor.DJI_3508_Yaw.DATA.Speed_now, 500.0f);
+            DJI_Motor_Send(&hfdcan2, 0x200, 0, 0, All_Motor.DJI_3508_Yaw.PID_S.Output, 0);
+
+            if (Check_Motor_Reached_Limit(&All_Motor.DJI_3508_Yaw, 500.0f, 3000.0f, 80)) {
+                g_calib_state = CALIB_DONE;
+            }
+            break;
+
+        case CALIB_DONE:
+            DJI_Motor_Send(&hfdcan2, 0x200, 0, 0, 0, 0); // 停转卸力
+            All_Motor.DJI_3508_Yaw.PID_S.Iout = 0.0f;
+
+            g_zero_offset_angle = All_Motor.DJI_3508_Yaw.DATA.Angle_Infinite;
+            g_mid_offset_angle = g_zero_offset_angle - 72550.0f;
+
+            // 给 Yaw 一个安全的初始 Ref，无缝衔接后续闭环
+            All_Motor.DJI_3508_Yaw.PID_P.Ref = g_mid_offset_angle;
+
+            g_calib_state = CALIB_NORMAL;
+            break;
+
+        case CALIB_NORMAL:
+            Ctrl_Shoot_Task();
+            break;
+    }
+}
+
 Feeder_t g_feeder = {0};
 
 #define COUNTS_PER_SHOT 36864.0f*2.5f*8/9

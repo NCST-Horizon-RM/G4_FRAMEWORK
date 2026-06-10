@@ -17,6 +17,8 @@ file(GLOB_RECURSE USER_SOURCES
 )
 
 add_executable(${CMAKE_PROJECT_NAME} ${USER_SOURCES}
+        User/BSP/Inc/BSP_UART.h
+        User/BSP/Src/BSP_UART.c
 )
 
 # 自动递归包含头文件

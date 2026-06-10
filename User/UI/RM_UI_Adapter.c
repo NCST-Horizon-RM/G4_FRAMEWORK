@@ -12,7 +12,7 @@ void print_message(const uint8_t* message, const int length) {
 }
 
 void update_rmui_robot_id(void) {
-    ui_self_id = User_data.robot_status.robot_id; // 从全局 User_data 获取机器人ID
+    ui_self_id = User_data.robot_status.robot_id;
 }
 
 // 数组初始化

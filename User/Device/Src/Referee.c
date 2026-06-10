@@ -3,9 +3,9 @@
 
 static void Referee_System_Info_Update(uint16_t cmd_id, uint8_t *data_ptr, User_Data_T *usr_data);
 
-/**
+/*/**
   * @brief  裁判系统数据解析
-  */
+  #1#
 void Referee_System_Frame_Update(uint8_t *Buff, uint16_t Size)
 {
     uint16_t i = 0;
@@ -47,6 +47,105 @@ void Referee_System_Frame_Update(uint8_t *Buff, uint16_t Size)
             }
         }
         // 如果不是 0xA5，或者校验失败，则只向后挪动 1 字节寻找下一个起始符
+        i++;
+    }
+}*/
+
+void Referee_System_Frame_Update(uint8_t *Buff, uint16_t Size)
+{
+    uint16_t i = 0;
+    uint16_t data_length = 0;
+    uint16_t cmd_id = 0;
+    uint8_t *data_ptr;
+
+    // 静态变量：用于保存上一次断包遗留下来的“尾巴”
+    static uint8_t remain_buf[REFEREE_MAX_PACKET_SIZE];
+    static uint16_t remain_len = 0; // 记录遗留尾巴的实际长度
+
+    if (Buff == NULL || Size == 0) return;
+
+    /* ----- 步骤一：处理上一次遗留下来的断包 ----- */
+    if (remain_len > 0)
+    {
+        // 计算新缓冲区需要借多少字节过来才能凑成一包
+        // 注意：此时遗留包的 remain_buf 里已经包含了原本的帧头，我们可以直接读出它需要的 data_length
+        if (remain_len >= 3) // 至少要拿到长度字段
+        {
+            data_length = (uint16_t)(remain_buf[2] << 8 | remain_buf[1])
+                        + FrameHeader_Length + CMDID_Length + CRC16_Length;
+
+            uint16_t need_len = data_length - remain_len;
+            // 如果新缓冲区的数据足够填满这个断包
+            if (Size >= need_len && data_length <= REFEREE_MAX_PACKET_SIZE)
+            {
+                // 把新缓冲区的头部拼接到遗留缓存的尾部
+                memcpy(&remain_buf[remain_len], Buff, need_len);
+                // 校验这个拼接完成的临时完整包
+                if (Verify_CRC8_Check_Sum(remain_buf, FrameHeader_Length) == true &&
+                    Verify_CRC16_Check_Sum(remain_buf, data_length) == true)
+                {
+                    cmd_id = (uint16_t)(remain_buf[FrameHeader_Length + 1] << 8 | remain_buf[FrameHeader_Length]);
+                    data_ptr = &remain_buf[FrameHeader_Length + CMDID_Length];
+                    Referee_System_Info_Update(cmd_id, data_ptr, &User_data);
+                }
+                // 拼接包处理完毕，新缓冲区的指针需要向后跳过被借走的 need_len 字节
+                i = need_len;
+            }
+            else
+            {
+                // 如果新来的数据太短，连剩下的断包都填不满（极端情况）
+                if (remain_len + Size < REFEREE_MAX_PACKET_SIZE) {
+                    memcpy(&remain_buf[remain_len], Buff, Size);
+                    remain_len += Size;
+                } else {
+                    remain_len = 0; // 异常超长，直接丢弃
+                }
+                return; // 新数据用完了，直接退出
+            }
+        }
+        remain_len = 0; // 清空暂存标记，准备开始常规遍历
+    }
+    while (i < Size)
+    {
+        if (Buff[i] == 0xA5)
+        {
+            // 检查剩余长度是否够一个帧头，不够的话说明帧头本身被截断了
+            if (i + FrameHeader_Length > Size)
+            {
+                remain_len = Size - i;
+                memcpy(remain_buf, &Buff[i], remain_len);
+                break;
+            }
+            // CRC8 校验帧头
+            if (Verify_CRC8_Check_Sum(&Buff[i], FrameHeader_Length) == true)
+            {
+                data_length = (uint16_t)(Buff[i+2] << 8 | Buff[i+1])
+                            + FrameHeader_Length + CMDID_Length + CRC16_Length;
+                // 【核心判断】检查整帧是否超出了当前缓冲区的边界（断包发生！）
+                if (i + data_length > Size)
+                {
+                    // 把这一段未完成的“尾巴”暂存到 remain_buf 中，留到下一次回调拼接
+                    remain_len = Size - i;
+                    if (remain_len <= REFEREE_MAX_PACKET_SIZE) {
+                        memcpy(remain_buf, &Buff[i], remain_len);
+                    } else {
+                        remain_len = 0; // 防御性清空
+                    }
+                    break; // 已经到缓冲区末尾了，直接退出循环
+                }
+                // 如果没越界，正常进行整帧 CRC16 校验
+                if (Verify_CRC16_Check_Sum(&Buff[i], data_length) == true)
+                {
+                    cmd_id = (uint16_t)(Buff[i + FrameHeader_Length + 1] << 8 | Buff[i + FrameHeader_Length]);
+                    data_ptr = &Buff[i + FrameHeader_Length + CMDID_Length];
+
+                    Referee_System_Info_Update(cmd_id, data_ptr, &User_data);
+
+                    i += data_length; // 成功跳过整帧
+                    continue;
+                }
+            }
+        }
         i++;
     }
 }

@@ -1,11 +1,12 @@
-build
+build/
 G4_Framework.jdebug
 G4_Framework.jdebug.user
+G4-GDB.jdebug
+G4-GDB.jdebug.user
 .settings/
 .idea/
 .vscode/
 .clangd/
 .ideagit rm -r --cached .
 mx.scratch
-
 G4一键启动OpenOCD.bat

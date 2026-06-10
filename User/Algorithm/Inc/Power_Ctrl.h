@@ -51,6 +51,7 @@ extern ALL_POWER_RX All_Power;
 extern float pall;
 
 extern int open;
+extern float basic_power_limit;
 void CAN_POWER_Rx(Power_Typedef* pPower, uint8_t *rx_data);
 void Buffer_Calc(Power_Typedef* Power,User_Data_T *user_data);
 

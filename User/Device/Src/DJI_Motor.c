@@ -43,7 +43,9 @@ void DJI_Motor_Send(FDCAN_HandleTypeDef* hcan, uint32_t stdid, int16_t n1, int16
     data[2] = n2 >> 8; data[3] = n2;
     data[4] = n3 >> 8; data[5] = n3;
     data[6] = n4 >> 8; data[7] = n4;
-    FDCAN_Send_Msg(hcan, stdid, data, 8);
+    if (HAL_FDCAN_GetTxFifoFreeLevel(hcan) > 0) {
+        FDCAN_Send_Msg(hcan, stdid, data, 8);
+    }
 }
 
 

@@ -41,6 +41,8 @@ typedef struct {
     float yaw, pitch;
     bool is_hurt;
     float hurt_dir;
+    uint64_t hurt_trigger_tick;
+
     bool is_detect;
 
     // 提示条数据
@@ -67,6 +69,7 @@ typedef struct {
     uint64_t last_poll_tick;
 } UI_t;
 
+void UI_UpdateHurtDirection(UI_t* ui, uint8_t armor_id, float chassis_yaw_ecd);
 void UI_Init(UI_t* ui, const ui_config_t* config);
 void UI_OnLoop(UI_t* ui);
 void UI_SendUartCmd(UI_t* ui);

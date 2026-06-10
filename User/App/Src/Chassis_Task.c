@@ -38,7 +38,7 @@ uint8_t Chassis_Control_Init(MOTOR_Typdef *MOTOR)
     for (int i = 0; i < 4; i++)
     {
         // 6020 舵向位置环：输入弧度误差，输出目标转速 (RPM)
-        PID_Init(&MOTOR->DJI_6020_Steer[i].PID_P, 250.0f, 50.0f, PID_6020_Pos,
+        PID_Init(&MOTOR->DJI_6020_Steer[i].PID_P, 250.0f, 30.0f, PID_6020_Pos,
                  0, 0, 0, 0, 0, Integral_Limit | ErrorHandle);
 
         // 6020 舵向速度环：输入 RPM 误差，输出电流值
@@ -69,6 +69,9 @@ void Chassis_Control_Task(MOTOR_Typdef *MOTOR) {
     PID_Calculate(&PID_Vy, S_Now.vy, vy_tar);
     PID_Calculate(&PID_Vw, S_Now.vw, vw_tar);
 
+    if (DBUS.Remote.S2 ==1) open =1;
+    else if (DBUS.Remote.S2 ==2) open =2;
+    else open =0;
     // 逆解算：根据加速度和速度目标，计算各轮 Aim 角度、Aim 转速及驱动前馈
     float drive_ff[4];
     Swerve_Inverse_Calc(drive_ff, MOTOR, PID_Vx.Output, PID_Vy.Output, PID_Vw.Output,

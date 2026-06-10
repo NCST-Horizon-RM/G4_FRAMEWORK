@@ -13,8 +13,9 @@
 typedef struct {
     uint8_t  cap_key;       // FSBB开关状态
     uint8_t  cap_state;     // 状态位 (0:正常, 1:故障)
-    float    nowPower;      // 当前输入功率
-    uint8_t  capVolt;       // 电容电压
+    float  bat_voltage;
+    float nowPower;
+    uint8_t  Cap_Capacity;       // 电容电压
     uint8_t  check_code;    // 校验位 (0xAA)
     uint8_t ONLINE_JUDGE_TIME;
 } CapRxData_t;
@@ -29,7 +30,7 @@ typedef union {
         uint8_t buffer_now;      // 裁判系统当前剩余缓冲能量
         uint8_t robot_state;     // 机器人存活状态
         uint8_t check_code;      // 校验位 (0xAA)
-        uint8_t reserved[3];     // 填充位，凑足CAN帧长度
+        uint8_t reserved[3];     // 保留位
     } Control;
     uint8_t raw_data[8];         // CAN发送数据缓冲区 (修正为8字节)
 } CapSetData_t;

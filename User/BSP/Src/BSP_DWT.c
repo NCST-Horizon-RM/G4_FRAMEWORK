@@ -10,7 +10,7 @@ static uint32_t CYCCNT_LAST;
 uint64_t CYCCNT64;
 static void DWT_CNT_Update(void);
 
-void DWT_Init(uint32_t CPU_Freq_mHz)
+void DWT_Init(uint32_t CPU_Freq_MHz)
 {
     /* 使能DWT外设 */
     CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
@@ -21,7 +21,7 @@ void DWT_Init(uint32_t CPU_Freq_mHz)
     /* 使能Cortex-M DWT CYCCNT寄存器 */
     DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
 
-    CPU_FREQ_Hz = CPU_Freq_mHz * 1000000;
+    CPU_FREQ_Hz = CPU_Freq_MHz * 1000000;
     CPU_FREQ_Hz_ms = CPU_FREQ_Hz / 1000;
     CPU_FREQ_Hz_us = CPU_FREQ_Hz / 1000000;
     CYCCNT_RountCount = 0;

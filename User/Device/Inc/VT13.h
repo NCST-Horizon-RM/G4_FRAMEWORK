@@ -54,9 +54,9 @@ typedef struct {
        uint8_t R_State;             /**< 右键状态 (点击/长按/释放) */
        uint8_t L_State;             /**< 左键状态 (点击/长按/释放) */
        uint8_t M_State;             /**< 中键状态 (点击/长按/释放) */
-       uint32_t R_PressTime;        /**< 右键按下计时 */
-       uint32_t L_PressTime;        /**< 左键按下计时 */
-       uint32_t M_PressTime;        /**< 中键按下计时 */
+       uint8_t R_PressTime;        /**< 右键按下计时 */
+       uint8_t L_PressTime;        /**< 左键按下计时 */
+       uint8_t M_PressTime;        /**< 中键按下计时 */
     } Mouse;
 
     /**
@@ -105,14 +105,13 @@ typedef struct {
 
 /**
  * @brief VT13 原始数据帧 21 字节位域结构体定义
- * @note 严格对应官方数据帧的位偏移量（Offset）与长度（Length）
  */
 typedef struct {
     // Byte 0 - 1
     uint8_t header1;            /**< 帧头1：固定值 0xA9 */
     uint8_t header2;            /**< 帧头2：固定值 0x53 */
 
-    // Byte 2 - 9 (遥控器与辅助按键)
+    // Byte 2 - 9 (遥控器)
     uint16_t channel0    : 11;  /**< 通道 0：接收端右摇杆水平位置 */
     uint16_t channel1    : 11;  /**< 通道 1：接收端右摇杆竖直位置 */
     uint16_t channel2    : 11;  /**< 通道 2：接收端左摇杆竖直位置 */

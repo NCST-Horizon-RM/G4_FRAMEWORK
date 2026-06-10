@@ -66,7 +66,7 @@ osThreadId_t TestTaskHandle;
 const osThreadAttr_t TestTask_attributes = {
   .name = "TestTask",
   .priority = (osPriority_t) osPriorityLow,
-  .stack_size = 256 * 4
+  .stack_size = 384 * 4
 };
 
 /* Private function prototypes -----------------------------------------------*/
