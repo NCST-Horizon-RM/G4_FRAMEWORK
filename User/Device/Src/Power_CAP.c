@@ -11,8 +11,12 @@ int open_cap_flag = 0;
  * @param cap_ptr 电容数据结构体指针
  * @param rx_buf  CAN接收缓冲区 (8 bytes)
  */
-void Power_Cap_Rx(Cap_t *cap_ptr, const uint8_t *rx_buf)
+void Power_Cap_Rx(void *instance, uint8_t *rx_buf)
 {
+    if (instance == NULL || rx_buf == NULL) return;
+
+    Cap_t *cap_ptr = (Cap_t *)instance;
+
     if (rx_buf[7] == 0xAA)
     {
         cap_ptr->get.cap_key   = rx_buf[0];

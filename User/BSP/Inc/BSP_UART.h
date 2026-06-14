@@ -9,4 +9,7 @@
 
 HAL_StatusTypeDef UART_ReceiveToIdle_DMA(UART_HandleTypeDef *huart, uint8_t *pData, uint16_t Size);
 
+void UART_App_Rx_Callback(UART_HandleTypeDef *huart, uint16_t Size);
+void UART_App_Error_Callback(UART_HandleTypeDef *huart);
+
 #endif //G4_FRAMEWORK_BSP_UART_H

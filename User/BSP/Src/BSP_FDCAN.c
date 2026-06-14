@@ -1,3 +1,4 @@
+#include "All_define.h"
 #include "BSP-FDCAN.h"
 
 /**
@@ -171,4 +172,59 @@ void HAL_FDCAN_ErrorCallback(FDCAN_HandleTypeDef *hfdcan)
             FDCAN_Config(hfdcan, target_fifo);
         }
     }
+}
+
+// 1. 显式声明跨层分发接口（弱函数，上层不实现则不执行）
+__weak void CAN_App_Frame_Dispatch(FDCAN_HandleTypeDef *hfdcan, uint32_t identifier, uint8_t *data, uint32_t len)
+{
+    (void)hfdcan; (void)identifier; (void)data; (void)len;
+}
+
+CCM_DATA CAN_Stats_t can1_stats;
+CCM_DATA CAN_Stats_t can2_stats;
+CCM_DATA CAN_Stats_t can3_stats;
+
+/**
+ * @brief 提取出的通用 FIFO 读取内核
+ */
+static inline void FDCAN_Rx_FIFO_Process(FDCAN_HandleTypeDef *hfdcan, uint32_t fifo, uint32_t its, CAN_Stats_t *stats)
+{
+    FDCAN_RxHeaderTypeDef rx_header;
+    uint8_t rx_data[8];
+    uint32_t fill_level;
+
+    // 统计 FIFO 状态
+    if (stats) {
+        uint32_t full_it = (fifo == FDCAN_RX_FIFO0) ? FDCAN_IT_RX_FIFO0_FULL : FDCAN_IT_RX_FIFO1_FULL;
+        uint32_t lost_it = (fifo == FDCAN_RX_FIFO0) ? FDCAN_IT_RX_FIFO0_MESSAGE_LOST : FDCAN_IT_RX_FIFO1_MESSAGE_LOST;
+        if (its & full_it)  stats->fifo_full_count++;
+        if (its & lost_it)  stats->msg_lost_count++;
+    }
+
+    // 循环读取 FIFO 确保不丢帧
+    while ((fill_level = HAL_FDCAN_GetRxFifoFillLevel(hfdcan, fifo)) > 0)
+    {
+        if (HAL_FDCAN_GetRxMessage(hfdcan, fifo, &rx_header, rx_data) != HAL_OK) {
+            if (stats) stats->error_count++;
+            break;
+        }
+        if (stats) stats->rx_count++;
+
+        // 【严格跨层】：直接抛给应用层，底层不需要知道这是什么电机
+        CAN_App_Frame_Dispatch(hfdcan, rx_header.Identifier, rx_data, DLC_To_Bytes(rx_header.DataLength));
+
+        if (fill_level > 64) break;
+    }
+}
+
+CCM_FUNC void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
+{
+    CAN_Stats_t *stats = (hfdcan->Instance == FDCAN1) ? &can1_stats : ((hfdcan->Instance == FDCAN3) ? &can3_stats : NULL);
+    FDCAN_Rx_FIFO_Process(hfdcan, FDCAN_RX_FIFO0, RxFifo0ITs, stats);
+}
+
+CCM_FUNC void HAL_FDCAN_RxFifo1Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo1ITs)
+{
+    CAN_Stats_t *stats = (hfdcan->Instance == FDCAN2) ? &can2_stats : NULL;
+    FDCAN_Rx_FIFO_Process(hfdcan, FDCAN_RX_FIFO1, RxFifo1ITs, stats);
 }

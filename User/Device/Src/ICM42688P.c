@@ -1,7 +1,7 @@
 //
 // Created by CaoKangqi on 2026/1/23.
 //
-#include "../Inc/ICM42688P.h"
+#include "ICM42688P.h"
 
 #include <tgmath.h>
 

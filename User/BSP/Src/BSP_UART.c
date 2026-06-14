@@ -37,3 +37,28 @@ HAL_StatusTypeDef UART_ReceiveToIdle_DMA(UART_HandleTypeDef *huart, uint8_t *pDa
     __HAL_DMA_DISABLE_IT(huart->hdmarx, DMA_IT_HT);
     return HAL_OK;
 }
+
+__weak void UART_App_Rx_Callback(UART_HandleTypeDef *huart, uint16_t Size) {
+    (void)huart; (void)Size;
+}
+
+__weak void UART_App_Error_Callback(UART_HandleTypeDef *huart) {
+    (void)huart;
+}
+
+/*/**
+ * @brief  HAL 库统一接收事件回调（空闲中断/正常满中断都会进这）
+ #1#
+void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
+    if (huart->hdmarx != NULL) {
+        __HAL_DMA_DISABLE_IT(huart->hdmarx, DMA_IT_HT);
+    }
+    UART_App_Rx_Callback(huart, Size);
+}
+
+/**
+ * @brief  HAL 库统一错误回调
+ #1#
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
+    UART_App_Error_Callback(huart);
+}*/

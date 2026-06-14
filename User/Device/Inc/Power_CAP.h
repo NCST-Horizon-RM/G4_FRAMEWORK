@@ -47,7 +47,7 @@ extern Cap_t cap;
 extern int open_cap_flag;
 
 /* 函数声明 */
-void Power_Cap_Rx(Cap_t *cap_ptr, const uint8_t *rx_buf);
+void Power_Cap_Rx(void *instance, uint8_t *rx_buf);
 void Power_Cap_Tx(hcan_t *hcan, uint16_t can_id, Cap_t *cap_ptr, User_Data_T *referee_data);
 
 #endif //G4_FRAMEWORK_POWER_CAP_H

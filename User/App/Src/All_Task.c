@@ -123,6 +123,7 @@ void Test_Task(void *argument)
         UI_SendUartCmd(&h_ui);
         //Ctrl_Test_Task();
         Motor_Calibration_Task();
+
         //Test_Tx();
         /*if (HAL_GetTick() - last_tick >= 250) {
             last_tick = HAL_GetTick();
@@ -185,157 +186,42 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef * huart){
     }
 }
 
-CCM_DATA CAN_Stats_t can1_stats;
-CCM_DATA CAN_Stats_t can2_stats;
-CCM_DATA CAN_Stats_t can3_stats;
-/**
- * @brief FDCAN FIFO0 接收中断回调函数
- * @note 优化要点：
- *       1. 循环读取FIFO直到为空，确保不丢帧
- *       2. 检测并处理FIFO溢出情况
- *       3. 减少中断内处理时间，提高实时性
- *       4. 统计接收数据，便于调试
- */
-CCM_FUNC void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
-{
-    FDCAN_RxHeaderTypeDef rx;
-    uint8_t data[8];
-    CAN_Stats_t *stats = NULL;
 
-    // 确定统计结构
-    if (hfdcan->Instance == FDCAN1)
-        stats = &can1_stats;
-    else if (hfdcan->Instance == FDCAN3)
-        stats = &can3_stats;
-    // 检测FIFO溢出，如果溢出则记录错误
-    if (RxFifo0ITs & FDCAN_IT_RX_FIFO0_FULL)
-    {
-        if (stats) stats->fifo_full_count++;
-    }
-    if (RxFifo0ITs & FDCAN_IT_RX_FIFO0_MESSAGE_LOST)
-    {
-        if (stats) stats->msg_lost_count++;
-    }
-    // 循环读取FIFO中的所有消息，确保不遗漏
-    uint32_t fill_level;
-    while ((fill_level = HAL_FDCAN_GetRxFifoFillLevel(hfdcan, FDCAN_RX_FIFO0)) > 0)
-    {
-        if (HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0, &rx, data) != HAL_OK)
-        {
-            if (stats) stats->error_count++;
-            break; // 读取失败，退出循环
-        }
-        if (stats) stats->rx_count++;
-        // 根据不同的FDCAN实例和ID分发消息
-        if (hfdcan->Instance == FDCAN1)
-        {
-            switch (rx.Identifier)
-            {
-                case 0x201:
-                    DJI_Motor_Resolve(&All_Motor.DJI_3508_Chassis[0], data);
-                    break;
-                case 0x202:
-                    DJI_Motor_Resolve(&All_Motor.DJI_3508_Chassis[1], data);
-                    break;
-                case 0x203:
-                    DJI_Motor_Resolve(&All_Motor.DJI_3508_Chassis[2], data);
-                    break;
-                case 0x204:
-                    DJI_Motor_Resolve(&All_Motor.DJI_3508_Chassis[3], data);
-                    break;
-                case 0x602:
-                    CAN_POWER_Rx(&All_Power.P_Chassis, data);
-                    Buffer_Calc(&All_Power.P_Chassis, &User_data);
-                    break;
-                case 0x206:
-                    DJI_Motor_Resolve(&All_Motor.DJI_6020_Pitch, data);
-                    break;
-                default:
-                    break;
-            }
-        }
-        else if (hfdcan->Instance == FDCAN3)
-        {
-            switch (rx.Identifier)
-            {
-                case 0x205:
-                    DJI_Motor_Resolve(&All_Motor.DJI_6020_Steer[0], data);
-                    break;
-                case 0x206:
-                    DJI_Motor_Resolve(&All_Motor.DJI_6020_Steer[1], data);
-                    break;
-                case 0x207:
-                    DJI_Motor_Resolve(&All_Motor.DJI_6020_Steer[2], data);
-                    break;
-                case 0x208:
-                    DJI_Motor_Resolve(&All_Motor.DJI_6020_Steer[3], data);
-                    break;
-                default:
-                    break;
-            }
-        }
-        if (fill_level > 64) break; // 安全保护，防止死循环
-    }
-}
+static const CAN_Rx_Route_t CAN_Rx_Config_Table[] = {
+    /* ----- FDCAN1 ----- */
+    {FDCAN1, 0x201, &All_Motor.DJI_3508_Chassis[0], DJI_Motor_Resolve},
+    {FDCAN1, 0x202, &All_Motor.DJI_3508_Chassis[1], DJI_Motor_Resolve},
+    {FDCAN1, 0x203, &All_Motor.DJI_3508_Chassis[2], DJI_Motor_Resolve},
+    {FDCAN1, 0x204, &All_Motor.DJI_3508_Chassis[3], DJI_Motor_Resolve},
+    {FDCAN1, 0x206, &All_Motor.DJI_6020_Pitch,      DJI_Motor_Resolve},
 
-/**
- * @brief FDCAN FIFO1 接收中断回调函数
- * @note
- */
-CCM_FUNC void HAL_FDCAN_RxFifo1Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo1ITs)
+    /* ----- FDCAN2 ----- */
+    {FDCAN2, 0x301, &All_Motor.DM4310_Feed,         DM_1to4_Resolve},
+    {FDCAN2, 0x202, &All_Motor.DJI_3508_Pull,       DJI_Motor_Resolve},
+    {FDCAN2, 0x203, &All_Motor.DJI_3508_Yaw,        DJI_Motor_Resolve},
+    {FDCAN2, 0x288, &cap,                    Power_Cap_Rx},// 超级电容
+
+    /* ----- FDCAN3 ----- */
+    {FDCAN3, 0x205, &All_Motor.DJI_6020_Steer[0],   DJI_Motor_Resolve},
+    {FDCAN3, 0x206, &All_Motor.DJI_6020_Steer[1],   DJI_Motor_Resolve},
+    {FDCAN3, 0x207, &All_Motor.DJI_6020_Steer[2],   DJI_Motor_Resolve},
+    {FDCAN3, 0x208, &All_Motor.DJI_6020_Steer[3],   DJI_Motor_Resolve},
+};
+
+CCM_FUNC void CAN_App_Frame_Dispatch(FDCAN_HandleTypeDef *hfdcan, uint32_t identifier, uint8_t *data, uint32_t len)
 {
-    FDCAN_RxHeaderTypeDef rx;
-    uint8_t data[8];
-    CAN_Stats_t *stats = NULL;
-    // 确定统计结构
-    if (hfdcan->Instance == FDCAN2)
-        stats = &can2_stats;
-    // 检测FIFO溢出
-    if (RxFifo1ITs & FDCAN_IT_RX_FIFO1_FULL)
+    (void)len; // 对齐接口后，长度信息在包装函数内处理或忽略
+    size_t table_size = sizeof(CAN_Rx_Config_Table) / sizeof(CAN_Rx_Route_t);
+    for (size_t i = 0; i < table_size; i++)
     {
-        if (stats) stats->fifo_full_count++;
-    }
-    if (RxFifo1ITs & FDCAN_IT_RX_FIFO1_MESSAGE_LOST)
-    {
-        if (stats) stats->msg_lost_count++;
-    }
-    // 循环读取FIFO中的所有消息
-    uint32_t fill_level;
-    while ((fill_level = HAL_FDCAN_GetRxFifoFillLevel(hfdcan, FDCAN_RX_FIFO1)) > 0)
-    {
-        if (HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO1, &rx, data) != HAL_OK)
+        if ((hfdcan->Instance == CAN_Rx_Config_Table[i].instance) &&
+            (identifier == CAN_Rx_Config_Table[i].id))
         {
-            if (stats) stats->error_count++;
-            break;
-        }
-        if (stats) stats->rx_count++;
-        if (hfdcan->Instance == FDCAN2)
-        {
-            switch (rx.Identifier)
+            if (CAN_Rx_Config_Table[i].resolve != NULL)
             {
-                case 0x603:
-                    CAN_POWER_Rx(&All_Power.P_Chassis, data);
-                    Buffer_Calc(&All_Power.P_Chassis, &User_data);
-                    break;
-                case 0x500:
-                    CAN_TP_Rx_Parser(data, DLC_To_Bytes(rx.DataLength));
-                    break;
-                case 0x301:
-                    DM_1to4_Resolve(&All_Motor.DM4310_Feed, data);
-                    break;
-                case 0x202:
-                    DJI_Motor_Resolve(&All_Motor.DJI_3508_Pull, data);
-                    break;
-                case 0x203:
-                    DJI_Motor_Resolve(&All_Motor.DJI_3508_Yaw, data);
-                    break;
-                case 0x288:
-                    Power_Cap_Rx(&cap, data);
-                    break;
-                default:
-                    break;
+                CAN_Rx_Config_Table[i].resolve(CAN_Rx_Config_Table[i].device_ptr, data);
             }
+            return;
         }
-        if (fill_level > 64) break;
     }
 }

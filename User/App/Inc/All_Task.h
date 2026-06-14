@@ -7,36 +7,17 @@
 
 #include "All_Init.h"
 
-#define off_line 0
-#define on_Line  1
+typedef void (*CAN_Resolve_Func_t)(void *instance, uint8_t *data);
 
-typedef struct
-{
-    float Vx;
-    float Vy;
-    float omega;
-    float LF;
-    float RF;
-    float LB;
-    float RB;
-}Speed_Solve;
-extern Speed_Solve Omni;
+// 路由表条目结构体
+typedef struct {
+    FDCAN_GlobalTypeDef *instance; // 对应的硬件总线：FDCAN1 / FDCAN2 / FDCAN3
+    uint32_t id;                   // 绑定的 CAN ID
+    void *device_ptr;              // 对应的应用层变量指针
+    CAN_Resolve_Func_t resolve;    // 对应的中层协议解析函数
+} CAN_Rx_Route_t;
 
-// CAN接收统计数据结构
-typedef struct
-{
-    uint32_t rx_count;          // 总接收消息数
-    uint32_t fifo_full_count;   // FIFO满次数
-    uint32_t msg_lost_count;    // 消息丢失次数
-    uint32_t error_count;       // 读取错误次数
-} CAN_Stats_t;
-
-extern CAN_Stats_t can1_stats;
-extern CAN_Stats_t can2_stats;
-extern CAN_Stats_t can3_stats;
-
-void CAN_GetStats(FDCAN_HandleTypeDef *hfdcan, CAN_Stats_t *stats);
-void CAN_ResetStats(void);
+void CAN_App_Frame_Dispatch(FDCAN_HandleTypeDef *hfdcan, uint32_t identifier, uint8_t *data, uint32_t len);
 
 extern uint16_t adc_dma_buffer[2];
 void speed_solve(void);
