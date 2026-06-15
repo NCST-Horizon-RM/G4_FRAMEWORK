@@ -66,8 +66,7 @@ float pall = 0;
 int open = 0;
 float chassis_power_limit = 0;
 float basic_power_limit = 0;
-uint8_t chassis_power_control(CONTAL_Typedef *RUI_V_CONTAL_V, User_Data_T *usr_data,
-                              model_t *model, Cap_t *CAP_GET, MOTOR_Typdef *MOTOR)
+uint8_t chassis_power_control( User_Data_T *usr_data, model_t *model, Cap_t *CAP_GET, MOTOR_Typdef *MOTOR)
 {
     pall = 0;
     uint16_t SuperPower = 150;

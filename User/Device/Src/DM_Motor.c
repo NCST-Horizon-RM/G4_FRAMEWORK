@@ -46,23 +46,18 @@ void DM_1to4_Resolve(void* instance, uint8_t* rx_data)
     int16_t spd_raw = (int16_t)((rx_data[2] << 8) | rx_data[3]);
     int16_t cur_raw = (int16_t)((rx_data[4] << 8) | rx_data[5]);
 
-    // 2. 多圈逻辑与零位偏移 (注意: 这里的 INIT_ANGLE 最好是 motor 里的成员变量，暂时沿用宏)
     int16_t angleError = motor->DATA.Angle_now - INIT_ANGLE;
     if (angleError > 4096)       angleError -= 8192;
     else if (angleError < -4096) angleError += 8192;
 
     motor->DATA.ralativeAngle = angleError * 0.043945f; // 360.0f / 8192.0f
 
-    // 3. 圈数统计逻辑
     int16_t diff = motor->DATA.Angle_now - motor->DATA.Angle_last;
     if      (diff < -4096) motor->DATA.round++;
     else if (diff >  4096) motor->DATA.round--;
 
-    // 4. 速度滤波
     motor->DATA.Speed_last = motor->DATA.Speed_now;
     motor->DATA.Speed_now  = OneFilter1(spd_raw / 100, motor->DATA.Speed_last, 500);
-
-    // 5. 状态物理量赋值与离线状态判断
     motor->DATA.current = (float)cur_raw;
     motor->DATA.Tcoil   = (float)rx_data[6];
     motor->DATA.Tmos    = (float)rx_data[7];

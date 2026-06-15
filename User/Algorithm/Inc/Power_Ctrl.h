@@ -29,8 +29,7 @@ void chassis_power_distribute(DJI_MOTOR_Typedef *motor[4],
                                  float I_cmd[4],
                                  float P_limit,
                                  model_t *model);
-uint8_t chassis_power_control(CONTAL_Typedef *RUI_V_CONTAL_V,
-                           User_Data_T *usr_data,
+uint8_t chassis_power_control(User_Data_T *usr_data,
                            model_t *model,
                            Cap_t *CAP_GET,
                            MOTOR_Typdef *MOTOR);
