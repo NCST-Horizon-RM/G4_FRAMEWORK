@@ -1,24 +1,6 @@
-//
-// Created by CaoKangqi on 2026/1/30.
-//
-/**
- ******************************************************************************
- * @file    QuaternionEKF.c
- * @author  Wang Hongxi
- * @version V1.2.0
- * @date    2022/3/8
- * @brief   attitude update with gyro bias estimate and chi-square test
- ******************************************************************************
- * @attention
- * 1st order LPF transfer function:
- *     1
- *  ———————
- *  as + 1
- ******************************************************************************
- */
 #include "QuaternionEKF.h"
 #include "user_lib.h"
-#include "CKQ_MATH.h"
+#include <math.h>
 
 QEKF_INS_t QEKF_INS={0};
 
@@ -70,13 +52,13 @@ void IMU_QuaternionEKF_Init(float process_noise1, float process_noise2, float me
     QEKF_INS.ErrorCount = 0;
     QEKF_INS.UpdateCount = 0;
 		QEKF_INS.dt = dt;
-
+    
 	if (lambda > 1)
     {
         lambda = 1;
     }
     QEKF_INS.lambda = lambda;
-
+		
     // 初始化矩阵维度信息
     Kalman_Filter_Init(&QEKF_INS.IMU_QuaternionEKF, 6, 0, 3);
     Matrix_Init(&QEKF_INS.ChiSquare, 1, 1, (float *)QEKF_INS.ChiSquare_Data);
@@ -105,9 +87,9 @@ void IMU_QuaternionEKF_Reset(void)
 {
     // 初始化矩阵维度信息
     Kalman_Filter_Reset(&QEKF_INS.IMU_QuaternionEKF, 6, 0, 3);
-
+	
 		memcpy(IMU_QuaternionEKF_P, IMU_QuaternionEKF_P_Const, sizeof(IMU_QuaternionEKF_P));
-
+    
 	// 姿态初始化
     QEKF_INS.IMU_QuaternionEKF.xhat_data[0] = 1;
     QEKF_INS.IMU_QuaternionEKF.xhat_data[1] = 0;
@@ -185,7 +167,7 @@ void IMU_QuaternionEKF_Update(float gx, float gy, float gz, float ax, float ay, 
     QEKF_INS.Accel[2] = QEKF_INS.Accel[2] * QEKF_INS.accLPFcoef / (QEKF_INS.dt + QEKF_INS.accLPFcoef) + az * QEKF_INS.dt / (QEKF_INS.dt + QEKF_INS.accLPFcoef);
 
     // set z,单位化重力加速度向量
-
+    
 	QEKF_INS.accl_norm = Sqrt(QEKF_INS.Accel[0] * QEKF_INS.Accel[0] + QEKF_INS.Accel[1] * QEKF_INS.Accel[1] + QEKF_INS.Accel[2] * QEKF_INS.Accel[2]);
 	accelInvNorm = 1.0f / QEKF_INS.accl_norm;
 
@@ -230,12 +212,18 @@ void IMU_QuaternionEKF_Update(float gx, float gy, float gz, float ax, float ay, 
     QEKF_INS.q[1] = QEKF_INS.IMU_QuaternionEKF.FilteredValue[1];
     QEKF_INS.q[2] = QEKF_INS.IMU_QuaternionEKF.FilteredValue[2];
     QEKF_INS.q[3] = QEKF_INS.IMU_QuaternionEKF.FilteredValue[3];
+    // 1. 计算 Roll (横滚角)
+    QEKF_INS.Roll = atan2f(QEKF_INS.q[0]*QEKF_INS.q[1] + QEKF_INS.q[2]*QEKF_INS.q[3],
+                           0.5f - QEKF_INS.q[1]*QEKF_INS.q[1] - QEKF_INS.q[2]*QEKF_INS.q[2]);
+    QEKF_INS.Roll *= 57.29578f;
 
-    QEKF_INS.Roll = CORDIC_Atan2_Fast(QEKF_INS.q[0]*QEKF_INS.q[1] + QEKF_INS.q[2]*QEKF_INS.q[3], 0.5f - QEKF_INS.q[1]*QEKF_INS.q[1] - QEKF_INS.q[2]*QEKF_INS.q[2]);
-    QEKF_INS.Roll  *=57.29578f;
-    QEKF_INS.Pitch =57.29578f * asinf(-2.0f * (QEKF_INS.q[1]*QEKF_INS.q[3] - QEKF_INS.q[0]*QEKF_INS.q[2]));
-    QEKF_INS.Yaw = CORDIC_Atan2_Fast(QEKF_INS.q[1]*QEKF_INS.q[2] + QEKF_INS.q[0]*QEKF_INS.q[3], 0.5f - QEKF_INS.q[2]*QEKF_INS.q[2] - QEKF_INS.q[3]*QEKF_INS.q[3]);
-    QEKF_INS.Yaw   *=57.29578f;
+    // 2. 计算 Pitch (俯仰角)
+    QEKF_INS.Pitch = 57.29578f * asinf(-2.0f * (QEKF_INS.q[1]*QEKF_INS.q[3] - QEKF_INS.q[0]*QEKF_INS.q[2]));
+
+    // 3. 计算 Yaw (偏航角)
+    QEKF_INS.Yaw = atan2f(QEKF_INS.q[1]*QEKF_INS.q[2] + QEKF_INS.q[0]*QEKF_INS.q[3],
+                          0.5f - QEKF_INS.q[2]*QEKF_INS.q[2] - QEKF_INS.q[3]*QEKF_INS.q[3]);
+    QEKF_INS.Yaw   *=57.29578f; 
 		QEKF_INS.GyroBias[0] = QEKF_INS.IMU_QuaternionEKF.FilteredValue[4];
     QEKF_INS.GyroBias[1] = QEKF_INS.IMU_QuaternionEKF.FilteredValue[5];
     QEKF_INS.GyroBias[2] = 0; // 大部分时候z轴通天,无法观测yaw的漂移
@@ -521,7 +509,6 @@ float Get_Yaw()
 {
 	return QEKF_INS.Yaw;
 }
-
 float Get_YawTotalAngle()
 {
     return QEKF_INS.YawTotalAngle;

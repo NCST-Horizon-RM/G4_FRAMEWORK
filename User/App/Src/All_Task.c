@@ -81,15 +81,19 @@ void Motor_Task(void *argument)
         Chassis_Control_Task(&All_Motor);
         //W25N01GV_ReadID(flash_id);// ID 应该是 EF AA 21
         VOFA_justfloat(
-            IMU_Data.pitch,
-            hfdcan2.ErrorCode,
-            All_Motor.DJI_6020_Steer[0].PID_S.Output,
-            All_Motor.DJI_6020_Steer[1].DATA.Speed_now,
-            All_Motor.DJI_6020_Steer[1].PID_S.Output,
-            All_Motor.DJI_6020_Steer[2].DATA.Speed_now,
-            All_Motor.DJI_6020_Steer[2].PID_S.Output,
-            All_Motor.DM4310_Yaw.PID_P.Ref,
-            IMU_Data.YawTotalAngle,All_Power.P_Chassis.power);
+            QEKF_INS.Pitch,
+            QEKF_INS.Roll,
+            QEKF_INS.Yaw,
+            mahony_filter.pitch,
+            mahony_filter.roll,
+            mahony_filter.yaw,
+            0,
+            0,
+            0,
+            vqf_filter.pitch,
+            vqf_filter.roll,
+            vqf_filter.yaw,
+            0);
         osDelay(1);
     }
 }

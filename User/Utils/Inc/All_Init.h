@@ -38,6 +38,7 @@
 #include "CAN_Comm.h"
 #include "Shoot_Task.h"
 #include "BSP_UART.h"
+#include "VQF_filter.h"
 
 extern uint8_t DBUS_RX_DATA[18];
 extern DBUS_Typedef DBUS;

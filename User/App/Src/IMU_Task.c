@@ -30,9 +30,7 @@ CCM_DATA IMU_CTRL_FLAG_t  imu_ctrl_flag  = {0};// 控制状态标志
 CCM_DATA PID_t imu_temp;
 CCM_DATA FuzzyRule_t fuzzy_rule_temp;
 IMU_Data_t IMU_Data = {
-    /*.accel_bias = {-0.0018742225f, -0.0085052567f, -0.3006388713f},
-    .accel_scale = {0.9930995110f, 0.9944899028f, 0.9923243716f}*/
-    .accel_bias = {-0.0039012455f, -0.0100767006f, -0.2877107718f},
+    .accel_bias = {-0.0039012455f, -0.0100767006f, -0.1077107718f},
     .accel_scale = {0.9982235869f, 1.0002515018f, 0.9962459264f}
 };
 
@@ -78,7 +76,7 @@ void IMU_Temp_Control_Init(void)
 
     // 2. 初始化模糊规则参数
     Fuzzy_Rule_Init(&fuzzy_rule_temp, NULL, NULL, NULL,
-        6.0f, 0.015f, 10.0f, // Kp, Ki, Kd Ratios
+        -6.0f, -0.015f, -10.0f, // Kp, Ki, Kd Ratios
         3.5f, // eStep
         0.85f // ecStep
         );
@@ -122,6 +120,8 @@ CCM_FUNC void IMU_Update_Task(float dt_s)
         case TEMP_INIT:
             IMU_Temp_Control_Init();
             mahony_init(&mahony_filter, 2.0f, 0.01f, 0.9f,dt_s);
+            IMU_QuaternionEKF_Init(10, 0.001f, 10000000, 1, 0.001f,0);
+            vqf_init(&vqf_filter,0.001f);
 #ifdef DEBUG_MODE
             imu_ctrl_state = TEMP_PID_CTRL;
 #endif
@@ -188,17 +188,26 @@ CCM_FUNC void IMU_Update_Task(float dt_s)
 
             //mahony姿态融合更新，实测效果还不错，QuaternionEKF有想法的自己整吧
             mahony_update(&mahony_filter,
-            IMU_Data.gyro[0], IMU_Data.gyro[1], IMU_Data.gyro[2],
-            IMU_Data.accel[0], IMU_Data.accel[1], IMU_Data.accel[2],dt_s);
+                        IMU_Data.gyro[0], IMU_Data.gyro[1], IMU_Data.gyro[2],
+                        IMU_Data.accel[0], IMU_Data.accel[1], IMU_Data.accel[2],dt_s);
             mahony_output(&mahony_filter);
-            IMU_Data.q[0] = mahony_filter.q0;
-            IMU_Data.q[1] = mahony_filter.q1;
-            IMU_Data.q[2] = mahony_filter.q2;
-            IMU_Data.q[3] = mahony_filter.q3;
-            IMU_Data.pitch = mahony_filter.pitch;
-            IMU_Data.roll = mahony_filter.roll;
-            IMU_Data.yaw = mahony_filter.yaw;
-            IMU_Data.YawTotalAngle = mahony_filter.YawTotalAngle;
+
+            vqf_update(&vqf_filter,
+                            IMU_Data.gyro[0], IMU_Data.gyro[1], IMU_Data.gyro[2],
+                            IMU_Data.accel[0], IMU_Data.accel[1], IMU_Data.accel[2]);
+            vqf_output(&vqf_filter);
+
+            IMU_QuaternionEKF_Update(IMU_Data.gyro[0], IMU_Data.gyro[1], IMU_Data.gyro[2],
+            IMU_Data.accel[0], IMU_Data.accel[1], IMU_Data.accel[2]);
+
+            IMU_Data.q[0] = vqf_filter.q[0];
+            IMU_Data.q[1] = vqf_filter.q[1];
+            IMU_Data.q[2] = vqf_filter.q[2];
+            IMU_Data.q[3] = vqf_filter.q[3];
+            IMU_Data.pitch = vqf_filter.pitch;
+            IMU_Data.roll = vqf_filter.roll;
+            IMU_Data.yaw = vqf_filter.yaw;
+            IMU_Data.YawTotalAngle = vqf_filter.YawTotalAngle;
             imu_ctrl_flag.fusion_enabled = 1;
             break;
         case ERROR_STATE:

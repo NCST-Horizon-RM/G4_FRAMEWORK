@@ -95,7 +95,7 @@ void Chassis_Control_Task(MOTOR_Typdef *MOTOR) {
         MOTOR->DJI_3508_Chassis[i].PID_S.Output += drive_ff[i];
         if (MOTOR->DJI_3508_Chassis[i].PID_S.Output>16384) MOTOR->DJI_3508_Chassis[i].PID_S.Output=16384;
         else if (MOTOR->DJI_3508_Chassis[i].PID_S.Output<-16384) MOTOR->DJI_3508_Chassis[i].PID_S.Output=-16384;
-        chassis_power_control(&contal,&User_data,&chassis_model,&cap,&All_Motor);
+        chassis_power_control(&User_data,&chassis_model,&cap,&All_Motor);
     }
 
     if (DBUS.ONLINE_JUDGE_TIME >= 5) {

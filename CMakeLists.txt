@@ -17,6 +17,8 @@ file(GLOB_RECURSE USER_SOURCES
 )
 
 add_executable(${CMAKE_PROJECT_NAME} ${USER_SOURCES}
+        User/Algorithm/Inc/VQF_filter.h
+        User/Algorithm/Src/VQF_filter.c
 
 )
 

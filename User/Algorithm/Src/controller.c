@@ -6,59 +6,54 @@
 /******************************** FUZZY PID **********************************/
 static float FuzzyRuleKpRAW[7][7] = {
     {PB, PB, PM, PM, PS, ZE, ZE},
-    {PB, PB, PM, PS, PS, ZE, PS},
-    {PM, PM, PM, PS, ZE, PS, PS},
-    {PM, PM, PS, ZE, PS, PM, PM},
-    {PS, PS, ZE, PS, PS, PM, PM},
-    {PS, ZE, PS, PM, PM, PM, PB},
-    {ZE, ZE, PM, PM, PM, PB, PB}};
+    {PB, PB, PM, PS, PS, ZE, NS},
+    {PM, PM, PM, PS, ZE, NS, NS},
+    {PM, PM, PS, ZE, NS, NM, NM},
+    {PS, PS, ZE, NS, NS, NM, NM},
+    {PS, ZE, NS, NM, NM, NM, NB},
+    {ZE, ZE, NM, NM, NM, NB, NB}};
 
 static float FuzzyRuleKiRAW[7][7] = {
-    {PB, PB, PM, PM, PS, ZE, ZE},
-    {PB, PB, PM, PS, PS, ZE, PS},
-    {PM, PM, PM, PS, ZE, PS, PS},
-    {PM, PM, PS, ZE, PS, PM, PM},
-    {PS, PS, ZE, PS, PS, PM, PM},
-    {PS, ZE, PS, PM, PM, PM, PB},
-    {ZE, ZE, PM, PM, PM, PB, PB}};
+    {NB, NB, NM, NM, NS, ZE, ZE},
+    {NB, NB, NM, NS, NS, ZE, ZE},
+    {NB, NM, NS, NS, ZE, PS, PS},
+    {NM, NM, NS, ZE, PS, PM, PM},
+    {NM, NS, ZE, PS, PS, PM, PB},
+    {ZE, ZE, PS, PS, PM, PB, PB},
+    {ZE, ZE, PS, PM, PM, PB, PB}};
 
 static float FuzzyRuleKdRAW[7][7] = {
-    {PB, PB, PM, PM, PS, ZE, ZE},
-    {PB, PB, PM, PS, PS, ZE, PS},
-    {PM, PM, PM, PS, ZE, PS, PS},
-    {PM, PM, PS, ZE, PS, PM, PM},
-    {PS, PS, ZE, PS, PS, PM, PM},
-    {PS, ZE, PS, PM, PM, PM, PB},
-    {ZE, ZE, PM, PM, PM, PB, PB}};
+    {PS, NS, NB, NB, NB, NM, PS},
+    {PS, NS, NB, NM, NM, NS, ZE},
+    {ZE, NS, NM, NM, NS, NS, ZE},
+    {ZE, NS, NS, NS, NS, NS, ZE},
+    {ZE, ZE, ZE, ZE, ZE, ZE, ZE},
+    {PB, NS, PS, PS, PS, PS, PB},
+    {PB, PM, PM, PM, PS, PS, PB}};
 
 void Fuzzy_Rule_Init(FuzzyRule_t *fuzzyRule, float (*fuzzyRuleKp)[7], float (*fuzzyRuleKi)[7], float (*fuzzyRuleKd)[7],
                      float kpRatio, float kiRatio, float kdRatio,
                      float eStep, float ecStep)
 {
-    if (fuzzyRuleKp == NULL)
-        fuzzyRule->FuzzyRuleKp = FuzzyRuleKpRAW;
-    else
-        fuzzyRule->FuzzyRuleKp = fuzzyRuleKp;
-    if (fuzzyRuleKi == NULL)
-        fuzzyRule->FuzzyRuleKi = FuzzyRuleKiRAW;
-    else
-        fuzzyRule->FuzzyRuleKi = fuzzyRuleKi;
-    if (fuzzyRuleKd == NULL)
-        fuzzyRule->FuzzyRuleKd = FuzzyRuleKdRAW;
-    else
-        fuzzyRule->FuzzyRuleKd = fuzzyRuleKd;
+    if (fuzzyRuleKp == NULL) fuzzyRule->FuzzyRuleKp = FuzzyRuleKpRAW;
+    else fuzzyRule->FuzzyRuleKp = fuzzyRuleKp;
+
+    if (fuzzyRuleKi == NULL) fuzzyRule->FuzzyRuleKi = FuzzyRuleKiRAW;
+    else fuzzyRule->FuzzyRuleKi = fuzzyRuleKi;
+
+    if (fuzzyRuleKd == NULL) fuzzyRule->FuzzyRuleKd = FuzzyRuleKdRAW;
+    else fuzzyRule->FuzzyRuleKd = fuzzyRuleKd;
 
     fuzzyRule->KpRatio = kpRatio;
     fuzzyRule->KiRatio = kiRatio;
     fuzzyRule->KdRatio = kdRatio;
 
-    if (eStep < 0.00001f)
-        eStep = 1;
-    if (ecStep < 0.00001f)
-        ecStep = 1;
+    if (eStep < 0.00001f) eStep = 1;
+    if (ecStep < 0.00001f) ecStep = 1;
     fuzzyRule->eStep = eStep;
     fuzzyRule->ecStep = ecStep;
 }
+
 void Fuzzy_Rule_Implementation(FuzzyRule_t *fuzzyRule, float measure, float ref)
 {
     float eLeftTemp, ecLeftTemp;
@@ -66,37 +61,37 @@ void Fuzzy_Rule_Implementation(FuzzyRule_t *fuzzyRule, float measure, float ref)
     int eLeftIndex, ecLeftIndex;
     int eRightIndex, ecRightIndex;
 
-    fuzzyRule->dt = DWT_GetDeltaT((void *)fuzzyRule->DWT_CNT);
+    fuzzyRule->dt = 1;
 
     fuzzyRule->e = ref - measure;
     fuzzyRule->ec = (fuzzyRule->e - fuzzyRule->eLast) / fuzzyRule->dt;
     fuzzyRule->eLast = fuzzyRule->e;
 
-    //隶属区间
+    // 隶属区间计算
     eLeftIndex = fuzzyRule->e >= 3 * fuzzyRule->eStep ? 6 : (fuzzyRule->e <= -3 * fuzzyRule->eStep ? 0 : (fuzzyRule->e >= 0 ? ((int)(fuzzyRule->e / fuzzyRule->eStep) + 3) : ((int)(fuzzyRule->e / fuzzyRule->eStep) + 2)));
     eRightIndex = fuzzyRule->e >= 3 * fuzzyRule->eStep ? 6 : (fuzzyRule->e <= -3 * fuzzyRule->eStep ? 0 : (fuzzyRule->e >= 0 ? ((int)(fuzzyRule->e / fuzzyRule->eStep) + 4) : ((int)(fuzzyRule->e / fuzzyRule->eStep) + 3)));
     ecLeftIndex = fuzzyRule->ec >= 3 * fuzzyRule->ecStep ? 6 : (fuzzyRule->ec <= -3 * fuzzyRule->ecStep ? 0 : (fuzzyRule->ec >= 0 ? ((int)(fuzzyRule->ec / fuzzyRule->ecStep) + 3) : ((int)(fuzzyRule->ec / fuzzyRule->ecStep) + 2)));
     ecRightIndex = fuzzyRule->ec >= 3 * fuzzyRule->ecStep ? 6 : (fuzzyRule->ec <= -3 * fuzzyRule->ecStep ? 0 : (fuzzyRule->ec >= 0 ? ((int)(fuzzyRule->ec / fuzzyRule->ecStep) + 4) : ((int)(fuzzyRule->ec / fuzzyRule->ecStep) + 3)));
 
-    //隶属度
+    // 隶属度计算
     eLeftTemp = fuzzyRule->e >= 3 * fuzzyRule->eStep ? 0 : (fuzzyRule->e <= -3 * fuzzyRule->eStep ? 1 : (eRightIndex - fuzzyRule->e / fuzzyRule->eStep - 3));
     eRightTemp = fuzzyRule->e >= 3 * fuzzyRule->eStep ? 1 : (fuzzyRule->e <= -3 * fuzzyRule->eStep ? 0 : (fuzzyRule->e / fuzzyRule->eStep - eLeftIndex + 3));
     ecLeftTemp = fuzzyRule->ec >= 3 * fuzzyRule->ecStep ? 0 : (fuzzyRule->ec <= -3 * fuzzyRule->ecStep ? 1 : (ecRightIndex - fuzzyRule->ec / fuzzyRule->ecStep - 3));
     ecRightTemp = fuzzyRule->ec >= 3 * fuzzyRule->ecStep ? 1 : (fuzzyRule->ec <= -3 * fuzzyRule->ecStep ? 0 : (fuzzyRule->ec / fuzzyRule->ecStep - ecLeftIndex + 3));
 
     fuzzyRule->KpFuzzy = eLeftTemp * ecLeftTemp * fuzzyRule->FuzzyRuleKp[eLeftIndex][ecLeftIndex] +
-                         eLeftTemp * ecRightTemp * fuzzyRule->FuzzyRuleKp[eRightIndex][ecLeftIndex] +
-                         eRightTemp * ecLeftTemp * fuzzyRule->FuzzyRuleKp[eLeftIndex][ecRightIndex] +
+                         eLeftTemp * ecRightTemp * fuzzyRule->FuzzyRuleKp[eLeftIndex][ecRightIndex] +
+                         eRightTemp * ecLeftTemp * fuzzyRule->FuzzyRuleKp[eRightIndex][ecLeftIndex] +
                          eRightTemp * ecRightTemp * fuzzyRule->FuzzyRuleKp[eRightIndex][ecRightIndex];
 
     fuzzyRule->KiFuzzy = eLeftTemp * ecLeftTemp * fuzzyRule->FuzzyRuleKi[eLeftIndex][ecLeftIndex] +
-                         eLeftTemp * ecRightTemp * fuzzyRule->FuzzyRuleKi[eRightIndex][ecLeftIndex] +
-                         eRightTemp * ecLeftTemp * fuzzyRule->FuzzyRuleKi[eLeftIndex][ecRightIndex] +
+                         eLeftTemp * ecRightTemp * fuzzyRule->FuzzyRuleKi[eLeftIndex][ecRightIndex] +
+                         eRightTemp * ecLeftTemp * fuzzyRule->FuzzyRuleKi[eRightIndex][ecLeftIndex] +
                          eRightTemp * ecRightTemp * fuzzyRule->FuzzyRuleKi[eRightIndex][ecRightIndex];
 
     fuzzyRule->KdFuzzy = eLeftTemp * ecLeftTemp * fuzzyRule->FuzzyRuleKd[eLeftIndex][ecLeftIndex] +
-                         eLeftTemp * ecRightTemp * fuzzyRule->FuzzyRuleKd[eRightIndex][ecLeftIndex] +
-                         eRightTemp * ecLeftTemp * fuzzyRule->FuzzyRuleKd[eLeftIndex][ecRightIndex] +
+                         eLeftTemp * ecRightTemp * fuzzyRule->FuzzyRuleKd[eLeftIndex][ecRightIndex] +
+                         eRightTemp * ecLeftTemp * fuzzyRule->FuzzyRuleKd[eRightIndex][ecLeftIndex] +
                          eRightTemp * ecRightTemp * fuzzyRule->FuzzyRuleKd[eRightIndex][ecRightIndex];
 }
 

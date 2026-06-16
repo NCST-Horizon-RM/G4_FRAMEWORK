@@ -7,8 +7,8 @@
 
 union main
 {
-    float data1[10];
-    uint8_t data2[44];
+    float data1[13];
+    uint8_t data2[56];
 }data;
 
 /**
@@ -25,7 +25,7 @@ union main
  * @param j
  * @param k
  */
-void VOFA_justfloat(float a,float b,float c,float d,float e,float f,float g,float h,float j,float k)
+void VOFA_justfloat(float a,float b,float c,float d,float e,float f,float g,float h,float j,float k,float l,float m,float n)
 { uint8_t i=0;
     data.data1[i++]=a;
     data.data1[i++]=b;
@@ -37,9 +37,12 @@ void VOFA_justfloat(float a,float b,float c,float d,float e,float f,float g,floa
     data.data1[i++]=h;
     data.data1[i++]=j;
     data.data1[i++]=k;
-    data.data2[40]=0x00;
-    data.data2[41]=0x00;
-    data.data2[42]=0x80;
-    data.data2[43]=0x7f;
-    HAL_UART_Transmit_DMA(&huart5,data.data2,sizeof(data.data2));
+    data.data1[i++]=l;
+    data.data1[i++]=m;
+    data.data1[i++]=n;
+    data.data2[52]=0x00;
+    data.data2[53]=0x00;
+    data.data2[54]=0x80;
+    data.data2[55]=0x7f;
+    HAL_UART_Transmit_DMA(&huart2,data.data2,sizeof(data.data2));
 }
